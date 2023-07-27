@@ -71,3 +71,6 @@ def argmax(d):
             max_key = key
 
     return max_key
+
+def test():
+    print('hello world')

@@ -1,6 +1,6 @@
 [project]
 name = "scraper_util_avliu"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = ['beautifulsoup4', 'urllib3']
 
 [build-system]
