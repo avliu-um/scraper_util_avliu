@@ -1,13 +1,13 @@
 [project]
 name = "scraper_util_avliu"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
     'beautifulsoup4',
     'urllib3',
     'selenium',
     'mysql-connector',
     'undetected-chromedriver',
-    'boto-3'
+    'boto3'
 ]
 
 [build-system]
