@@ -12,9 +12,10 @@ import urllib.error
 import mysql.connector
 
 import boto3
+import datetime
 
 
-def get_selenium_driver(undetected=False):
+def get_selenium_driver(undetected=False, **kwargs):
 
     # adblock_filepath = '../lib/adblock.crx'
 
@@ -22,13 +23,13 @@ def get_selenium_driver(undetected=False):
         chrome_options = uc.ChromeOptions()
         chrome_options.add_argument('--mute-audio')
         # chrome_options.add_extension(adblock_filepath)
-        driver = uc.Chrome(options=chrome_options)
+        driver = uc.Chrome(options=chrome_options, **kwargs)
 
     else:
         chrome_options = webdriver.ChromeOptions()
         chrome_options.add_argument('--mute-audio')
         # chrome_options.add_extension(adblock_filepath)
-        driver = webdriver.Chrome(options=chrome_options)
+        driver = webdriver.Chrome(options=chrome_options, **kwargs)
 
     return driver
 
@@ -119,20 +120,26 @@ def write_to_rds():
         f")"
     )
 
-def test_write_logs():
-    AWS_REGION = "us-west-2" #TODO: Fill
-    client = boto3.client('cloudwatch', region_name=AWS_REGION)
+def get_log_time():
+    dt = datetime.datetime.now()
+    epoch = datetime.datetime.utcfromtimestamp(0)
+    time = int((dt - epoch).total_seconds() * 1000.0)
+    return time
+
+
+def write_cloudwatch_log(log_group, log_stream, message):
+    client = boto3.client('logs')
     response = client.put_log_events(
-        logGroupName='TODO',
-        logStreamName='TODO',
+        logGroupName=log_group,
+        logStreamName=log_stream,
         logEvents=[
             {
-                'timestamp': 123,
-                'message': 'THIS IS A TEST LOG MESSAGE'
+                'timestamp': get_log_time(),
+                'message': message
             },
-        ],
-        sequenceToken='TODO'
+        ]
     )
+    print(f'response: {response}')
 
 
 def write_to_bucket(aws_bucket, source, dest):
