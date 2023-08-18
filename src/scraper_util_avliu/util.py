@@ -1,5 +1,5 @@
 import json
-from os import path
+import os
 import re
 import time
 
@@ -15,26 +15,49 @@ import boto3
 import datetime
 
 
-def get_selenium_driver(undetected=False, **kwargs):
-
+def get_selenium_driver(undetected=False):
     # adblock_filepath = '../lib/adblock.crx'
 
     if undetected:
+
+        # The below code is extremely hacky, but accomplishes a few things:
+        # (1) Makes default headless/executable to be the one we need in cloud
+        # (2) Allows us to specify other options locally via env vars for testing
+        # (3) Maintains everything in detected chromedriver because it doesn't need edecutable
+
+        # Goal is to set custom env variable only if we're running locally
+        headless = os.environ.get('HEADLESS')
+        if not headless:
+            headless = 'True'
+        headless = False if headless == 'False' else True
+
+        driver_executable_path = os.environ.get('DRIVER_EXECUTABLE_PATH')
+        if not driver_executable_path:
+            driver_executable_path = '/usr/bin/chromedriver'
+        print(f'headless={headless}, path={driver_executable_path}')
+        # See if we actually need this in cloud
+        # use_subprocess = True
+
         chrome_options = uc.ChromeOptions()
         chrome_options.add_argument('--mute-audio')
         # chrome_options.add_extension(adblock_filepath)
-        driver = uc.Chrome(options=chrome_options, **kwargs)
+        driver = uc.Chrome(options=chrome_options,
+                           headless=headless,
+                           driver_executable_path=driver_executable_path)
 
     else:
         chrome_options = webdriver.ChromeOptions()
         chrome_options.add_argument('--mute-audio')
         # chrome_options.add_extension(adblock_filepath)
-        driver = webdriver.Chrome(options=chrome_options, **kwargs)
+        driver = webdriver.Chrome(options=chrome_options)
 
     return driver
 
 
-def get_soup(url):
+def get_soup(url_or_driver):
+    if type(url_or_driver) == uc.Chrome or type(url_or_driver) == webdriver.Chrome:
+        return BeautifulSoup(url_or_driver.page_source, "html.parser")
+
     success = False
     sleep_time = 1
     max_sleep_time = 60 * 5
@@ -42,7 +65,7 @@ def get_soup(url):
     req, html_page = None, None
     while not success:
         try:
-            req = Request(url)
+            req = Request(url_or_driver)
             html_page = urlopen(req)
             success = True
         except urllib.error.HTTPError as e:
@@ -67,7 +90,7 @@ def get_soup_text(soup: BeautifulSoup, search_str: str, one=False):
 
 
 def append_to_json(json_file, new_data):
-    if path.isfile(json_file):
+    if os.path.isfile(json_file):
         with open(json_file, 'r') as fp:
             all_data = json.load(fp)
     else:
@@ -83,6 +106,19 @@ def append_to_file(file_name, new_data):
     with open(file_name, 'a') as f:
         for data in new_data:
             f.write(f'{data}\n')
+
+
+def find_in_dict(my_dict: dict, key: str):
+    # print(f'keys considered: {list(my_dict.keys())}')
+    if key in my_dict.keys():
+        return my_dict[key]
+    ans = False
+    for v in my_dict.values():
+        if type(v) == dict:
+            temp = find_in_dict(v, key)
+            if temp != False:
+                ans = temp
+    return ans
 
 
 # Replace newlines/tabs with the symbol |
@@ -119,6 +155,7 @@ def write_to_rds():
         f"PRIMARY KEY (vin, date_accessed)"
         f")"
     )
+
 
 def get_log_time():
     dt = datetime.datetime.now()
