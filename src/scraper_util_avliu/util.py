@@ -39,7 +39,12 @@ def get_selenium_driver(undetected=False):
         # use_subprocess = True
 
         chrome_options = uc.ChromeOptions()
-        chrome_options.add_argument('--mute-audio')
+        chrome_options.add_argument('--no-sandbox')
+        #chrome_options.add_argument('--headless')
+        chrome_options.add_argument('--ignore-certificate-errors')
+        chrome_options.add_argument('--disable-dev-shm-usage')
+        chrome_options.add_argument('--disable-extensions')
+        chrome_options.add_argument('--disable-gpu')
         # chrome_options.add_extension(adblock_filepath)
         driver = uc.Chrome(options=chrome_options,
                            headless=headless,
@@ -47,7 +52,12 @@ def get_selenium_driver(undetected=False):
 
     else:
         chrome_options = webdriver.ChromeOptions()
-        chrome_options.add_argument('--mute-audio')
+        chrome_options.add_argument('--no-sandbox')
+        #chrome_options.add_argument('--headless')
+        chrome_options.add_argument('--ignore-certificate-errors')
+        chrome_options.add_argument('--disable-dev-shm-usage')
+        chrome_options.add_argument('--disable-extensions')
+        chrome_options.add_argument('--disable-gpu')
         # chrome_options.add_extension(adblock_filepath)
         driver = webdriver.Chrome(options=chrome_options)
 
