@@ -48,6 +48,7 @@ def get_selenium_driver(undetected=False):
         # chrome_options.add_extension(adblock_filepath)
         driver = uc.Chrome(options=chrome_options,
                            headless=headless,
+                           use_subprocess=True,
                            driver_executable_path=driver_executable_path)
 
     else:
