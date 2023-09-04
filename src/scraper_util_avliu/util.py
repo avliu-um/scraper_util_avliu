@@ -40,12 +40,14 @@ def get_selenium_driver(undetected=False):
 
         chrome_options = uc.ChromeOptions()
         chrome_options.add_argument('--no-sandbox')
-        #chrome_options.add_argument('--headless')
         chrome_options.add_argument('--ignore-certificate-errors')
         chrome_options.add_argument('--disable-dev-shm-usage')
         chrome_options.add_argument('--disable-extensions')
         chrome_options.add_argument('--disable-gpu')
+        chrome_options.add_argument("--remote-debugging-port=9222")
         # chrome_options.add_extension(adblock_filepath)
+        if headless:
+            chrome_options.add_argument('--headless')
         driver = uc.Chrome(options=chrome_options,
                            headless=headless,
                            use_subprocess=True,
@@ -54,11 +56,13 @@ def get_selenium_driver(undetected=False):
     else:
         chrome_options = webdriver.ChromeOptions()
         chrome_options.add_argument('--no-sandbox')
-        #chrome_options.add_argument('--headless')
         chrome_options.add_argument('--ignore-certificate-errors')
         chrome_options.add_argument('--disable-dev-shm-usage')
         chrome_options.add_argument('--disable-extensions')
         chrome_options.add_argument('--disable-gpu')
+        # TODO: Fix this error!
+        if headless:
+            chrome_options.add_argument('--headless')
         # chrome_options.add_extension(adblock_filepath)
         driver = webdriver.Chrome(options=chrome_options)
 
@@ -194,6 +198,20 @@ def write_to_bucket(aws_bucket, source, dest):
     # Make sure to configure ~/.aws/configure file
     s3 = boto3.resource('s3')
     s3.Bucket(aws_bucket).upload_file(source, dest)
+
+
+def write_to_sqs(sqs_queue_id: str, messages_list: list):
+    sqs = boto3.client('sqs')
+    # Convert dictionary to json
+    entries = [{'Id': str(i), 'MessageBody': json.dumps(message)} for i, message in enumerate(messages_list)]
+
+    # Send message to SQS queue
+    response = sqs.send_message_batch(
+        QueueUrl=sqs_queue_id,
+        Entries=entries
+    )
+
+    print(f'write to sqs response: {response}')
 
 
 def main():
