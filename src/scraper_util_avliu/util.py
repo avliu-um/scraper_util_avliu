@@ -205,13 +205,17 @@ def write_to_sqs(sqs_queue_id: str, messages_list: list):
     # Convert dictionary to json
     entries = [{'Id': str(i), 'MessageBody': json.dumps(message)} for i, message in enumerate(messages_list)]
 
-    # Send message to SQS queue
-    response = sqs.send_message_batch(
-        QueueUrl=sqs_queue_id,
-        Entries=entries
-    )
+    # Splitting into chunks of 10
+    chunks = [entries[i:i + 10] for i in range(0, len(entries), 10)]
 
-    print(f'write to sqs response: {response}')
+    # Send message to SQS queue
+    for chunk in chunks:
+        entries = [{'Id': str(i), 'MessageBody': json.dumps(message)} for i, message in enumerate(chunk)]
+        response = sqs.send_message_batch(
+            QueueUrl=sqs_queue_id,
+            Entries=entries
+        )
+        print(f'write to sqs response: {response}')
 
 
 def main():
