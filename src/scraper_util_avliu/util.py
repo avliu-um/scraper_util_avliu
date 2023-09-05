@@ -200,6 +200,7 @@ def write_to_bucket(aws_bucket, source, dest):
     s3.Bucket(aws_bucket).upload_file(source, dest)
 
 
+# Write a list of messages to SQS queue
 def write_to_sqs(sqs_queue_id: str, messages_list: list):
     sqs = boto3.client('sqs')
     # Convert dictionary to json
@@ -216,6 +217,42 @@ def write_to_sqs(sqs_queue_id: str, messages_list: list):
             Entries=entries
         )
         print(f'write to sqs response: {response}')
+
+
+# Read one message from SQS queue
+def read_from_sqs(sqs_queue_id: str):
+    # Borrowed from: https://boto3.amazonaws.com/v1/documentation/api/latest/guide/sqs-example-sending-receiving-msgs.html
+    # Create SQS client
+    sqs = boto3.client('sqs')
+
+    # Receive message from SQS queue
+    response = sqs.receive_message(
+        QueueUrl=sqs_queue_id,
+        AttributeNames=[
+            'SentTimestamp'
+        ],
+        MaxNumberOfMessages=1,
+        MessageAttributeNames=[
+            'All'
+        ],
+        VisibilityTimeout=0,
+        WaitTimeSeconds=0
+    )
+
+    message = response['Messages'][0]
+    receipt_handle = message['ReceiptHandle']
+
+    # Delete received message from queue
+    sqs.delete_message(
+        QueueUrl=sqs_queue_id,
+        ReceiptHandle=receipt_handle
+    )
+
+    message_body = message['Body']
+    message_body = json.loads(message_body)
+    message_body = message_body['MessageBody'] if 'MessageBody' in message_body.keys() else message_body
+
+    return message_body
 
 
 def main():

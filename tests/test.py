@@ -26,6 +26,13 @@ def test_write_sqs():
     util.write_to_sqs(sqs_queue_id, message_list)
 
 
+def test_read_sqs():
+    sqs_queue_id = 'ev_test_sqs_queue'
+    for i in range(2):
+        message = util.read_from_sqs(sqs_queue_id)
+        print(f'i: {i}, message: {message}')
+
+
 if __name__ == '__main__':
     print(os.getcwd())
-    test_write_sqs()
+    test_read_sqs()
