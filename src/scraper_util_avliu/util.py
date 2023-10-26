@@ -19,22 +19,10 @@ def get_selenium_driver(undetected=False):
     # adblock_filepath = '../lib/adblock.crx'
 
     if undetected:
-
-        # The below code is extremely hacky, but accomplishes a few things:
-        # (1) Makes default headless/executable to be the one we need in cloud
-        # (2) Allows us to specify other options locally via env vars for testing
-        # (3) Maintains everything in detected chromedriver because it doesn't need edecutable
-
-        # Goal is to set custom env variable only if we're running locally
-        headless = os.environ.get('HEADLESS')
-        if not headless:
-            headless = 'True'
-        headless = False if headless == 'False' else True
-
         driver_executable_path = os.environ.get('DRIVER_EXECUTABLE_PATH')
         if not driver_executable_path:
             driver_executable_path = '/usr/bin/chromedriver'
-        print(f'headless={headless}, path={driver_executable_path}')
+        print(f'path={driver_executable_path}')
         # See if we actually need this in cloud
         # use_subprocess = True
 
@@ -46,10 +34,7 @@ def get_selenium_driver(undetected=False):
         chrome_options.add_argument('--disable-gpu')
         chrome_options.add_argument("--remote-debugging-port=9222")
         # chrome_options.add_extension(adblock_filepath)
-        if headless:
-            chrome_options.add_argument('--headless')
         driver = uc.Chrome(options=chrome_options,
-                           headless=headless,
                            use_subprocess=True,
                            driver_executable_path=driver_executable_path)
 
@@ -60,9 +45,6 @@ def get_selenium_driver(undetected=False):
         chrome_options.add_argument('--disable-dev-shm-usage')
         chrome_options.add_argument('--disable-extensions')
         chrome_options.add_argument('--disable-gpu')
-        # TODO: Fix this error!
-        if headless:
-            chrome_options.add_argument('--headless')
         # chrome_options.add_extension(adblock_filepath)
         driver = webdriver.Chrome(options=chrome_options)
 
@@ -146,15 +128,17 @@ def remove_symbols_str(s):
     return re.sub("[|+:,.]", '', s)
 
 
-def write_to_rds():
+def write_to_rds(table_name: str, schema: list, data_dict: dict):
     # Make a mysql connection and create a table if it exists
-    table_name = 'ebay_ev_sales'
     mydb = mysql.connector.connect(
-        host="database-1.cchq0zbz9fej.us-east-1.rds.amazonaws.com",
+        host=os.environ.get('rds_endpoint'),
+        # TODO
         user="admin",
         password="12345678",
         database="ev-database-test"
     )
+
+    # TODO: Move
     mycursor = mydb.cursor()
     mycursor.execute(
         f"CREATE TABLE IF NOT EXISTS {table_name} "
@@ -170,6 +154,30 @@ def write_to_rds():
         f"PRIMARY KEY (vin, date_accessed)"
         f")"
     )
+
+    sql = f"INSERT IGNORE INTO {table_name} VALUES (%s, now(), %s, %s, %s, %s, %s, %s)"
+    val_list = []
+    for col in schema:
+        filt_keys = list(filter(lambda x: col in x.lower(), data_dict.keys()))
+        if len(filt_keys) == 0:
+            val_list.append('')
+        else:
+            val_list.append(data_dict[filt_keys[0]])
+    val = tuple(val_list)
+    mycursor.execute(sql, val)
+    mydb.commit()
+
+
+def batch_submit_job(job_name, job_def, job_queue):
+    client = boto3.client('batch')
+    response = client.submit_job(
+        jobName=job_name,
+        jobQueue=job_queue,
+        jobDefinition=job_def,
+        shareIdentifier='high',
+        schedulingPriorityOverride=9999
+    )
+    print(f'batch submit job repsonse: {response}')
 
 
 def get_log_time():
@@ -194,7 +202,7 @@ def write_cloudwatch_log(log_group, log_stream, message):
     print(f'response: {response}')
 
 
-def write_to_bucket(aws_bucket, source, dest):
+def write_to_s3(aws_bucket, source, dest):
     # Make sure to configure ~/.aws/configure file
     s3 = boto3.resource('s3')
     s3.Bucket(aws_bucket).upload_file(source, dest)
@@ -243,16 +251,23 @@ def read_from_sqs(sqs_queue_id: str):
     receipt_handle = message['ReceiptHandle']
 
     # Delete received message from queue
+    # TODO: Move out
     sqs.delete_message(
         QueueUrl=sqs_queue_id,
         ReceiptHandle=receipt_handle
     )
 
+    message_id = message['MessageId'] if 'MessageId' in message.keys() else 'UnknownId'
     message_body = message['Body']
     message_body = json.loads(message_body)
-    message_body = message_body['MessageBody'] if 'MessageBody' in message_body.keys() else message_body
+    message_content = json.loads(message_body['MessageBody']) if 'MessageBody' in message_body.keys() else message_body
 
-    return message_body
+    return message_id, message_content
+
+
+def get_today():
+    today = datetime.datetime.today().strftime('%Y-%m-%d')
+    return today
 
 
 def main():
@@ -262,7 +277,7 @@ def main():
     f.close()
     destination = 'test_folder/test_results_file.txt'
 
-    write_to_bucket(bucket, "./test_result_file.txt", destination)
+    write_to_s3(bucket, "./test_result_file.txt", destination)
 
 
 if __name__ == '__main__':
